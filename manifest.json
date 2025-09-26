@@ -1,0 +1,15 @@
+{
+    "id": "e8bebe16-c6f9-410d-8104-345b19279b56",
+    "version": "1.0.0",
+    "platform": "all",
+    "arch": "all",
+    "name": "SD Image Detailer",
+    "logo": "/logo.png",
+    "keywords": [],
+    "devTools": false,
+    "main": {
+        "url": "index.html",
+        "width": 640,
+        "height": 480
+    }
+}

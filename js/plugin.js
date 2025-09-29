@@ -1,29 +1,34 @@
 eagle.onPluginCreate(async (plugin) => {
     console.log('eagle.onPluginCreate');
 
+    // テーマ適用
     updateTheme();
-    let selected_items = await eagle.item.getSelected();
 
-    // 選択数表示
+    // Upscaler, ADtailerModelのドロップダウンリスト読み込み
+    await loadDropdowns();
+
+    // 選択ファイル数
+    let selected_items = await eagle.item.getSelected();
     document.querySelector('#selected-count').innerText = selected_items.length;
 
-    // 選択ファイル名リスト表示
+    // 選択ファイルリスト表示
     let filesEl = document.querySelector('#selected-files');
-    filesEl.innerHTML = ""; // まずクリア
+    filesEl.innerHTML = ""; // クリア
+    let fileItems = {};
     selected_items.forEach(item => {
-        let div = document.createElement('div');
-        div.textContent = item.name; // item.name でファイル名
-        filesEl.appendChild(div);
+        fileItems[item.id] = addFileItem(item);
     });
 
-    // 生成ボタンイベント
+    // 生成ボタンの処理
     document.querySelector('#generate-btn').addEventListener('click', async () => {
-        document.querySelector('#progress').innerText = "処理中...";
+        let selected_items = await eagle.item.getSelected();
+        let total = selected_items.length;
+        let completed = 0;
+
+        updateProgress(0, completed, total);
 
         for (let item of selected_items) {
             let payload = parseAnnotation(item.annotation);
-
-            // 追加パラメータ
             payload.send_images = false;
             payload.save_images = true;
 
@@ -61,10 +66,11 @@ eagle.onPluginCreate(async (plugin) => {
                 };
             }
 
-            await sendToSD(payload);
-        }
+            await sendToSD(payload, fileItems[item.id]);
 
-        document.querySelector('#progress').innerText = "完了！";
+            completed++;
+            updateProgress(Math.round((completed / total) * 100), completed, total);
+        }
     });
 });
 
@@ -74,8 +80,6 @@ eagle.onPluginRun(() => {
 
 eagle.onPluginShow(async () => {
     console.log('eagle.onPluginShow');
-    //document.querySelector('#selected-count').innerText = selected_items.length;
-
 });
 
 eagle.onPluginHide(() => {
@@ -88,19 +92,14 @@ eagle.onPluginBeforeExit((event) => {
 
 function parseAnnotation(annotation) {
     let payload = {};
-
-    // Prompt と Negative Prompt
     let [promptPart, rest] = annotation.split("Negative prompt:");
-    if (promptPart) {
-        payload.prompt = promptPart.trim();
-    }
+    if (promptPart) payload.prompt = promptPart.trim();
     if (rest) {
         let [negPromptPart, restConfig] = rest.split(/Steps:/);
         payload.negative_prompt = negPromptPart.trim();
         rest = "Steps:" + restConfig;
     }
 
-    // 各パラメータを正規表現で抽出
     const regexMap = {
         steps: /Steps:\s*(\d+)/,
         sampler_name: /Sampler:\s*([^,]+)/,
@@ -126,23 +125,120 @@ function parseAnnotation(annotation) {
             }
         }
     }
-
     return payload;
 }
 
-async function sendToSD(payload) {
+async function sendToSD(payload, fileItem) {
     let url = "http://127.0.0.1:7860/sdapi/v1/txt2img";
-    try {
-        let response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
-        let data = await response.json();
-        console.log("SD response:", data);
-    } catch (err) {
-        console.error("Error:", err);
+    let progressUrl = "http://127.0.0.1:7860/sdapi/v1/progress";
+
+    let generationPromise = fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+
+    let isDone = false;
+    generationPromise.then(() => isDone = true).catch(() => isDone = true);
+
+    while (!isDone) {
+        try {
+            let res = await fetch(progressUrl);
+            let prog = await res.json();
+            let percent = Math.round(prog.progress * 100);
+            if (fileItem) fileItem.setProgress(percent);
+        } catch (err) {
+            console.warn("Progress check error:", err);
+        }
+        await new Promise(r => setTimeout(r, 500));
     }
+
+    let res = await generationPromise;
+    let data = await res.json();
+    if (fileItem) fileItem.setProgress(100, true);
+    console.log("SD response:", data);
+    return data;
+}
+
+function updateProgress(percent, completed, total) {
+    document.querySelector('#progress-bar').style.width = percent + "%";
+    document.querySelector('#progress-text').innerText = `完了ファイル数：${completed} / ${total} (${percent}%)`;
+}
+
+async function loadDropdowns() {
+    try {
+        // Upscalers
+        let upscalerRes = await fetch("http://127.0.0.1:7860/sdapi/v1/upscalers");
+        let upscalers = await upscalerRes.json();
+        let upscalerSelect = document.getElementById("hires-upscaler");
+        upscalerSelect.innerHTML = "";
+        upscalers.forEach(u => {
+            let opt = document.createElement("option");
+            opt.value = u.name;
+            opt.textContent = u.name;
+            upscalerSelect.appendChild(opt);
+        });
+        upscalerSelect.value = "4x-AnimeSharp";
+
+        // ADetailer models
+        let adetailerRes = await fetch("http://127.0.0.1:7860/adetailer/v1/ad_model");
+        let adModels = await adetailerRes.json();
+        let adetailerSelect = document.getElementById("adetailer-model");
+        adetailerSelect.innerHTML = "";
+        (adModels.ad_model || []).forEach(model => {
+            let opt = document.createElement("option");
+            opt.value = model;
+            opt.textContent = model;
+            adetailerSelect.appendChild(opt);
+        });
+        adetailerSelect.value = "face_yolov8n.pt";
+    } catch (err) {
+        console.error("Dropdown load error:", err);
+    }
+}
+
+function addFileItem(file) {
+    const container = document.getElementById("selected-files");
+
+    const item = document.createElement("div");
+    item.className = "file-item";
+
+    const thumb = document.createElement("img");
+    thumb.className = "file-thumbnail";
+    thumb.src = file.thumbnailPath || file.thumbnailURL;
+
+    const info = document.createElement("div");
+    info.className = "file-info";
+
+    const name = document.createElement("div");
+    name.className = "file-name";
+    name.textContent = file.name + "." + file.ext;
+
+    const progressContainer = document.createElement("div");
+    progressContainer.className = "file-progress-container";
+
+    const progressBar = document.createElement("div");
+    progressBar.className = "file-progress-bar";
+    progressContainer.appendChild(progressBar);
+
+    info.appendChild(name);
+    info.appendChild(progressContainer);
+
+    item.appendChild(thumb);
+    item.appendChild(info);
+    container.appendChild(item);
+
+    return {
+        item,
+        name,
+        progressContainer,
+        progressBar,
+        setProgress(pct, done = false) {
+            this.progressContainer.style.display = "block";
+            this.progressBar.style.width = pct + "%";
+            if (done) this.progressBar.style.background = "#4caf50";
+        }
+    };
 }
 
 async function updateTheme() {
@@ -151,20 +247,17 @@ async function updateTheme() {
         LIGHT: 'light',
         LIGHTGRAY: 'lightgray',
         GRAY: 'gray',
-        DARK: 'light',
+        DARK: 'dark',
         BLUE: 'blue',
         PURPLE: 'purple',
     };
-
     const theme = eagle.app.theme.toUpperCase();
     console.log('current Theme:', theme);
     const themeName = THEME_SUPPORT[theme] ?? 'dark';
     const htmlEl = document.querySelector('html');
-
     htmlEl.classList.add('no-transition');
     htmlEl.setAttribute('theme', themeName);
     htmlEl.setAttribute('platform', eagle.app.platform);
     htmlEl.classList.remove('no-transition');
-
     console.log('Theme applied:', themeName);
 }

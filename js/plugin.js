@@ -4,9 +4,6 @@ eagle.onPluginCreate(async (plugin) => {
     // テーマ適用
     await updateTheme();
 
-    // Upscaler, ADtailerModelのドロップダウンリスト読み込み
-    await loadDropdowns();
-
     // 選択ファイル取得
     let selected_items = await eagle.item.getSelected();
     document.querySelector('#selected-count').innerText = selected_items.length;
@@ -25,6 +22,15 @@ eagle.onPluginCreate(async (plugin) => {
     toggleFieldset(document.getElementById('hires-enabled').closest('fieldset'), document.getElementById('hires-enabled'));
     toggleFieldset(document.getElementById('adetailer-enabled').closest('fieldset'), document.getElementById('adetailer-enabled'));
 
+    // URL入力欄が変更されたときにドロップダウン再読み込み
+    const webuiUrlInput = document.getElementById("webui-url");
+    webuiUrlInput.addEventListener("change", async () => {
+        console.log("WebUI URL changed:", webuiUrlInput.value);
+        await loadDropdowns();
+    });
+
+    // Upscaler, ADtailerModelのドロップダウンリスト読み込み
+    await loadDropdowns();
     // 生成ボタン
     document.querySelector('#generate-btn').addEventListener('click', async () => {
         let selected_items = await eagle.item.getSelected();
@@ -137,34 +143,48 @@ function parseAnnotation(annotation) {
 }
 
 async function sendToSD(payload, fileItem) {
-    let url = "http://127.0.0.1:7860/sdapi/v1/txt2img";
-    let progressUrl = "http://127.0.0.1:7860/sdapi/v1/progress";
-
-    let generationPromise = fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-    });
+    const baseUrl = document.getElementById("webui-url").value;
+    const url = `${baseUrl}/sdapi/v1/txt2img`;
+    const progressUrl = `${baseUrl}/sdapi/v1/progress`;
 
     let isDone = false;
-    generationPromise.then(() => isDone = true).catch(() => isDone = true);
+    let data = null;
 
-    while (!isDone) {
-        try {
-            let res = await fetch(progressUrl);
-            let prog = await res.json();
-            let percent = Math.round(prog.progress * 100);
-            if (fileItem) fileItem.setProgress(percent);
-        } catch (err) {
-            console.warn("Progress check error:", err);
+    try {
+        const generationPromise = fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        // 完了フラグを更新
+        generationPromise.then(() => isDone = true).catch(() => isDone = true);
+
+        // 進捗ポーリング
+        while (!isDone) {
+            try {
+                const res = await fetch(progressUrl);
+                const prog = await res.json();
+                const percent = Math.round(prog.progress * 100);
+                if (fileItem) fileItem.setProgress(percent);
+            } catch (err) {
+                console.warn("Progress check error:", err);
+            }
+            await new Promise(r => setTimeout(r, 500));
         }
-        await new Promise(r => setTimeout(r, 500));
+
+        // 最終レスポンス取得
+        const res = await generationPromise;
+        data = await res.json();
+        if (fileItem) fileItem.setProgress(100, true);
+        console.log("SD response:", data);
+
+    } catch (err) {
+        console.error("Error during generation:", err);
+        if (fileItem) fileItem.setProgress(0); // エラー時は進捗リセット
+        data = null;
     }
 
-    let res = await generationPromise;
-    let data = await res.json();
-    if (fileItem) fileItem.setProgress(100, true);
-    console.log("SD response:", data);
     return data;
 }
 
@@ -174,11 +194,26 @@ function updateProgress(percent, completed, total) {
 }
 
 async function loadDropdowns() {
+    const baseUrl = document.getElementById("webui-url").value;
+
+    const upscalerSelect = document.getElementById("hires-upscaler");
+    const adetailerSelect = document.getElementById("adetailer-model");
+    const upscalerError = document.getElementById("hires-upscaler-error");
+    const adetailerError = document.getElementById("adetailer-model-error");
+    const generateBtn = document.getElementById("generate-btn"); // 追加
+
+    upscalerSelect.innerHTML = "";
+    adetailerSelect.innerHTML = "";
+    upscalerError.textContent = "";
+    adetailerError.textContent = "";
+
+    let allSuccess = true;
+    generateBtn.disabled = true; // 一旦無効化
+
     try {
-        let upscalerRes = await fetch("http://127.0.0.1:7860/sdapi/v1/upscalers");
+        // Upscalers
+        let upscalerRes = await fetch(`${baseUrl}/sdapi/v1/upscalers`);
         let upscalers = await upscalerRes.json();
-        let upscalerSelect = document.getElementById("hires-upscaler");
-        upscalerSelect.innerHTML = "";
         upscalers.forEach(u => {
             let opt = document.createElement("option");
             opt.value = u.name;
@@ -186,11 +221,16 @@ async function loadDropdowns() {
             upscalerSelect.appendChild(opt);
         });
         upscalerSelect.value = "4x-AnimeSharp";
+    } catch (err) {
+        console.error("Upscaler fetch error:", err);
+        upscalerError.textContent = "※取得失敗";
+        allSuccess = false;
+    }
 
-        let adetailerRes = await fetch("http://127.0.0.1:7860/adetailer/v1/ad_model");
+    try {
+        // ADetailer models
+        let adetailerRes = await fetch(`${baseUrl}/adetailer/v1/ad_model`);
         let adModels = await adetailerRes.json();
-        let adetailerSelect = document.getElementById("adetailer-model");
-        adetailerSelect.innerHTML = "";
         (adModels.ad_model || []).forEach(model => {
             let opt = document.createElement("option");
             opt.value = model;
@@ -199,8 +239,13 @@ async function loadDropdowns() {
         });
         adetailerSelect.value = "face_yolov8n.pt";
     } catch (err) {
-        console.error("Dropdown load error:", err);
+        console.error("ADetailer fetch error:", err);
+        adetailerError.textContent = "※取得失敗";
+        allSuccess = false;
     }
+
+    // 成功判定で生成ボタンを切り替え
+    generateBtn.disabled = !allSuccess;
 }
 
 function addFileItem(file) {

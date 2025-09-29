@@ -30,6 +30,7 @@
                 <label>
                     Upscaler:
                     <select id="hires-upscaler"></select>
+                    <span id="hires-upscaler-error" class="error-text"></span>
                 </label>
                 <label>Upscale: <input type="number" id="hires-scale" value="1.5" step="0.1"></label>
                 <label>Denoising strength: <input type="number" id="hires-denoise" value="0.2" step="0.01"></label>
@@ -42,9 +43,17 @@
                 <label>
                     モデル:
                     <select id="adetailer-model"></select>
+                    <span id="adetailer-model-error" class="error-text"></span>
                 </label>
                 <label>Denoising strength: <input type="number" id="adetailer-denoise" value="0.2" step="0.01"></label>
             </fieldset>
+        </div>
+
+        <div class="section" id="webui-section">
+            <label>
+                Stable Diffusion WebUI URL:
+                <input type="text" id="webui-url" value="http://127.0.0.1:7860">
+            </label>
         </div>
 
         <div class="section">

@@ -163,6 +163,12 @@ select option {
 	color: var(--color-text-primary);
 }
 
+.error-text {
+	color: red;
+	margin-left: 0.5em;
+	font-size: 0.85em;
+}
+
 /* ボタン */
 button {
 	padding: 6px 12px;
@@ -235,7 +241,6 @@ button:hover {
 .file-progress-container {
 	background: #eee;
 	height: 8px;
-	/* 少し薄く */
 	border-radius: 3px;
 	overflow: hidden;
 	display: none;
@@ -246,4 +251,9 @@ button:hover {
 	height: 100%;
 	width: 0%;
 	transition: width 0.3s;
+}
+
+button:disabled {
+	opacity: 0.5;
+	pointer-events: none;
 }

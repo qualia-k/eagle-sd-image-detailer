@@ -15,41 +15,40 @@
             <div id="selected-files"></div>
         </div>
 
-        <div class="section">
-            <h4>Hires Fix</h4>
-            <label><input type="checkbox" id="hires-enabled" checked> 有効にする</label>
-            <label>
-                Upscaler:
-                <select id="hires-upscaler"></select>
-            </label>
-            <label>Upscale: <input type="number" id="hires-scale" value="1.5" step="0.1"></label>
-            <label>Denoising strength: <input type="number" id="hires-denoise" value="0.2" step="0.01"></label>
-        </div>
-
-        <div class="section">
-            <h4>ADetailer</h4>
-            <label><input type="checkbox" id="adetailer-enabled" checked> 有効にする</label>
-            <label>
-                モデル:
-                <select id="adetailer-model"></select>
-            </label>
-            <label>Denoising strength: <input type="number" id="adetailer-denoise" value="0.2" step="0.01"></label>
-        </div>
-
-        <div class="section">
-            <button id="generate-btn">生成</button>
-        </div>
-
         <div id="progress" class="section">
             <!-- 全体進捗 -->
-            <div id="progress-text">0 / 0</div>
+            <div id="progress-text">完了ファイル：0 / 0</div>
             <div
                 style="background:#ccc; height:20px; width:100%; border-radius:4px; overflow:hidden; margin-bottom:1em;">
                 <div id="progress-bar" style="background:#4caf50; height:100%; width:0%;"></div>
             </div>
+        </div>
 
-            <!-- 個別進捗リスト -->
-            <div id="file-progress-list"></div>
+        <div class="section">
+            <fieldset class="modern-block">
+                <legend><input type="checkbox" id="hires-enabled" checked> Hires. Fix</legend>
+                <label>
+                    Upscaler:
+                    <select id="hires-upscaler"></select>
+                </label>
+                <label>Upscale: <input type="number" id="hires-scale" value="1.5" step="0.1"></label>
+                <label>Denoising strength: <input type="number" id="hires-denoise" value="0.2" step="0.01"></label>
+            </fieldset>
+        </div>
+
+        <div class="section">
+            <fieldset class="modern-block">
+                <legend><input type="checkbox" id="adetailer-enabled" checked> ADetailer</legend>
+                <label>
+                    モデル:
+                    <select id="adetailer-model"></select>
+                </label>
+                <label>Denoising strength: <input type="number" id="adetailer-denoise" value="0.2" step="0.01"></label>
+            </fieldset>
+        </div>
+
+        <div class="section">
+            <button id="generate-btn">生成</button>
         </div>
     </main>
 </body>

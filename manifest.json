@@ -9,7 +9,7 @@
     "devTools": false,
     "main": {
         "url": "index.html",
-        "width": 640,
-        "height": 1080
+        "width": 500,
+        "height": 900
     }
 }

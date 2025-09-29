@@ -2,24 +2,30 @@ eagle.onPluginCreate(async (plugin) => {
     console.log('eagle.onPluginCreate');
 
     // テーマ適用
-    updateTheme();
+    await updateTheme();
 
     // Upscaler, ADtailerModelのドロップダウンリスト読み込み
     await loadDropdowns();
 
-    // 選択ファイル数
+    // 選択ファイル取得
     let selected_items = await eagle.item.getSelected();
     document.querySelector('#selected-count').innerText = selected_items.length;
 
     // 選択ファイルリスト表示
     let filesEl = document.querySelector('#selected-files');
-    filesEl.innerHTML = ""; // クリア
+    filesEl.innerHTML = "";
     let fileItems = {};
     selected_items.forEach(item => {
         fileItems[item.id] = addFileItem(item);
     });
 
-    // 生成ボタンの処理
+    // ウィンドウ高さ自動調整
+    await adjustWindowHeight(selected_items.length);
+
+    toggleFieldset(document.getElementById('hires-enabled').closest('fieldset'), document.getElementById('hires-enabled'));
+    toggleFieldset(document.getElementById('adetailer-enabled').closest('fieldset'), document.getElementById('adetailer-enabled'));
+
+    // 生成ボタン
     document.querySelector('#generate-btn').addEventListener('click', async () => {
         let selected_items = await eagle.item.getSelected();
         let total = selected_items.length;
@@ -37,8 +43,8 @@ eagle.onPluginCreate(async (plugin) => {
                 payload.hr_upscaler = document.querySelector('#hires-upscaler').value;
                 payload.hr_scale = parseFloat(document.querySelector('#hires-scale').value);
                 payload.denoising_strength = parseFloat(document.querySelector('#hires-denoise').value);
-                payload.hr_cfg = 2.5,
-                    payload.hr_scheduler = "Automatic"
+                payload.hr_cfg = 2.5;
+                payload.hr_scheduler = "Automatic";
             }
 
             if (document.querySelector('#adetailer-enabled').checked) {
@@ -89,6 +95,8 @@ eagle.onPluginHide(() => {
 eagle.onPluginBeforeExit((event) => {
     console.log('eagle.onPluginBeforeExit');
 });
+
+// --- ユーティリティ関数 ---
 
 function parseAnnotation(annotation) {
     let payload = {};
@@ -162,12 +170,11 @@ async function sendToSD(payload, fileItem) {
 
 function updateProgress(percent, completed, total) {
     document.querySelector('#progress-bar').style.width = percent + "%";
-    document.querySelector('#progress-text').innerText = `完了ファイル数：${completed} / ${total} (${percent}%)`;
+    document.querySelector('#progress-text').innerText = `完了ファイル：${completed} / ${total} (${percent}%)`;
 }
 
 async function loadDropdowns() {
     try {
-        // Upscalers
         let upscalerRes = await fetch("http://127.0.0.1:7860/sdapi/v1/upscalers");
         let upscalers = await upscalerRes.json();
         let upscalerSelect = document.getElementById("hires-upscaler");
@@ -180,7 +187,6 @@ async function loadDropdowns() {
         });
         upscalerSelect.value = "4x-AnimeSharp";
 
-        // ADetailer models
         let adetailerRes = await fetch("http://127.0.0.1:7860/adetailer/v1/ad_model");
         let adModels = await adetailerRes.json();
         let adetailerSelect = document.getElementById("adetailer-model");
@@ -241,6 +247,35 @@ function addFileItem(file) {
     };
 }
 
+async function adjustWindowHeight(selectedCount) {
+    const baseHeight = 460;      // main padding + ヘッダー + ボタンなど余白
+    const itemHeight = 60;       // .file-item の高さ目安
+    const maxHeight = 900;       // ウィンドウ最大高さ
+
+    // 選択ファイルに応じた高さ
+    selectedCount = Math.min(selectedCount, 3);
+    let newHeight = baseHeight + selectedCount * itemHeight;
+    if (newHeight > maxHeight) newHeight = maxHeight;
+
+    // ウィンドウサイズを設定
+    await eagle.window.setSize(500, newHeight);
+}
+
+function toggleFieldset(fieldset, checkbox) {
+    function update() {
+        const disabled = !checkbox.checked;
+        Array.from(fieldset.querySelectorAll('input, select, label')).forEach(el => {
+            if (el !== checkbox) {
+                el.disabled = disabled;
+                el.style.opacity = disabled ? 0.6 : 1;
+            }
+        });
+    }
+
+    checkbox.addEventListener('change', update);
+    update();
+}
+
 async function updateTheme() {
     const THEME_SUPPORT = {
         AUTO: eagle.app.isDarkColors() ? 'gray' : 'light',
@@ -252,12 +287,10 @@ async function updateTheme() {
         PURPLE: 'purple',
     };
     const theme = eagle.app.theme.toUpperCase();
-    console.log('current Theme:', theme);
     const themeName = THEME_SUPPORT[theme] ?? 'dark';
     const htmlEl = document.querySelector('html');
     htmlEl.classList.add('no-transition');
     htmlEl.setAttribute('theme', themeName);
     htmlEl.setAttribute('platform', eagle.app.platform);
     htmlEl.classList.remove('no-transition');
-    console.log('Theme applied:', themeName);
 }

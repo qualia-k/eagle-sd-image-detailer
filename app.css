@@ -63,7 +63,6 @@ main {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
-	height: 100%;
 	padding: 4px 24px 24px 24px;
 	font-size: 14px;
 }
@@ -110,7 +109,7 @@ main div#content {
 
 .modern-block input:disabled,
 .modern-block select:disabled {
-	background-color: #ddd;
+	background-color: #ebebeb;
 	cursor: not-allowed;
 	color: #888;
 }
@@ -256,4 +255,27 @@ button:hover {
 button:disabled {
 	opacity: 0.5;
 	pointer-events: none;
+}
+
+input:disabled {
+	background-color: #ddd;
+	cursor: not-allowed;
+	color: #888;
+}
+
+#generate-btn {
+	background-color: var(--btn-generate-bg, rgb(211, 112, 65));
+	color: white;
+}
+
+#generate-btn:hover {
+	background-color: var(--btn-generate-hover, rgb(216, 112, 15));
+}
+
+#generate-btn.generating {
+	background-color: var(--btn-cancel-bg, rgb(143, 143, 143));
+}
+
+#generate-btn.generating:hover {
+	background-color: var(--btn-cancel-hover, rgb(193, 193, 193));
 }

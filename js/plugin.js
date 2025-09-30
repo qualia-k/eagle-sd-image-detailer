@@ -31,8 +31,30 @@ eagle.onPluginCreate(async (plugin) => {
 
     // Upscaler, ADtailerModelのドロップダウンリスト読み込み
     await loadDropdowns();
+
     // 生成ボタン
-    document.querySelector('#generate-btn').addEventListener('click', async () => {
+    const generateBtn = document.querySelector('#generate-btn');
+    const resultMessage = document.querySelector('#result-message');
+    generateBtn.addEventListener('click', async () => {
+        if (generateBtn.classList.contains("generating")) {
+            // 中断
+            generateBtn.style.display = "none";
+            resultMessage.textContent = "生成を中断しました";
+            resultMessage.style.display = "inline";
+            await callSDInterruptAPI();
+            return;
+        }
+
+        generateBtn.textContent = "中断";
+        generateBtn.classList.add("generating");
+
+        const controls = document.querySelectorAll("input, select, textarea");
+        controls.forEach(el => {
+            if (el !== generateBtn) {
+                el.disabled = true;
+            }
+        });
+
         let selected_items = await eagle.item.getSelected();
         let total = selected_items.length;
         let completed = 0;
@@ -78,10 +100,21 @@ eagle.onPluginCreate(async (plugin) => {
                 };
             }
 
-            await sendToSD(payload, fileItems[item.id]);
+            const result = await callSDGenerationAPI(payload, fileItems[item.id]);
+
+            if (result.interrupted) {
+                console.warn("中断で停止");
+                break;
+            }
 
             completed++;
             updateProgress(Math.round((completed / total) * 100), completed, total);
+
+            // 生成完了
+            if (completed == total) {
+                generateBtn.style.display = "none";
+                resultMessage.style.display = "inline";
+            }
         }
     });
 });
@@ -142,50 +175,75 @@ function parseAnnotation(annotation) {
     return payload;
 }
 
-async function sendToSD(payload, fileItem) {
+async function callSDGenerationAPI(payload, fileItem) {
     const baseUrl = document.getElementById("webui-url").value;
-    const url = `${baseUrl}/sdapi/v1/txt2img`;
+    const generationUrl = `${baseUrl}/sdapi/v1/txt2img`;
     const progressUrl = `${baseUrl}/sdapi/v1/progress`;
 
     let isDone = false;
     let data = null;
+    let interrupted = false; // ★中断フラグ
 
     try {
-        const generationPromise = fetch(url, {
+        const generationPromise = fetch(generationUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
 
-        // 完了フラグを更新
         generationPromise.then(() => isDone = true).catch(() => isDone = true);
 
-        // 進捗ポーリング
-        while (!isDone) {
+        while (!isDone && !interrupted) {
             try {
                 const res = await fetch(progressUrl);
                 const prog = await res.json();
+
+                if (prog.state?.interrupted) {
+                    console.warn("Generation interrupted!");
+                    interrupted = true;
+                    break;
+                }
+
                 const percent = Math.round(prog.progress * 100);
                 if (fileItem) fileItem.setProgress(percent);
+
             } catch (err) {
                 console.warn("Progress check error:", err);
             }
             await new Promise(r => setTimeout(r, 500));
         }
 
-        // 最終レスポンス取得
-        const res = await generationPromise;
-        data = await res.json();
-        if (fileItem) fileItem.setProgress(100, true);
-        console.log("SD response:", data);
+        if (!interrupted) {
+            // 最終レスポンス
+            const res = await generationPromise;
+            data = await res.json();
+            if (fileItem) fileItem.setProgress(100, true);
+            console.log("SD response:", data);
+        }
 
     } catch (err) {
         console.error("Error during generation:", err);
-        if (fileItem) fileItem.setProgress(0); // エラー時は進捗リセット
+        if (fileItem) fileItem.setProgress(0);
         data = null;
     }
 
-    return data;
+    return { data, interrupted };
+}
+
+async function callSDInterruptAPI() {
+    const baseUrl = document.getElementById("webui-url").value;
+    const interruptUrl = `${baseUrl}/sdapi/v1/interrupt`;
+
+    try {
+        const res = await fetch(interruptUrl, { method: "POST" });
+        if (res.ok) {
+            console.log("Generation interrupted successfully");
+        } else {
+            console.error("Failed to interrupt generation:", res.status);
+        }
+    } catch (err) {
+        console.error("Interrupt request error:", err);
+    }
 }
 
 function updateProgress(percent, completed, total) {

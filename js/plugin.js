@@ -139,12 +139,24 @@ eagle.onPluginBeforeExit((event) => {
 
 function parseAnnotation(annotation) {
     let payload = {};
-    let [promptPart, rest] = annotation.split("Negative prompt:");
-    if (promptPart) payload.prompt = promptPart.trim();
-    if (rest) {
-        let [negPromptPart, restConfig] = rest.split(/Steps:/);
-        payload.negative_prompt = negPromptPart.trim();
-        rest = "Steps:" + restConfig;
+    let promptPart = "";
+    let rest = "";
+
+    if (annotation.includes("Negative prompt:")) {
+        // Negative prompt がある場合
+        [promptPart, rest] = annotation.split("Negative prompt:");
+        payload.prompt = promptPart.trim();
+
+        if (rest) {
+            let [negPromptPart, restConfig] = rest.split(/Steps:/);
+            payload.negative_prompt = negPromptPart.trim();
+            rest = "Steps:" + restConfig;
+        }
+    } else {
+        // Negative prompt がない場合
+        let [promptOnly, restConfig] = annotation.split(/Steps:/);
+        if (promptOnly) payload.prompt = promptOnly.trim();
+        if (restConfig) rest = "Steps:" + restConfig;
     }
 
     const regexMap = {

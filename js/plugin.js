@@ -190,11 +190,10 @@ function parseAnnotation(annotation) {
 async function callSDGenerationAPI(payload, fileItem) {
     const baseUrl = document.getElementById("webui-url").value;
     const generationUrl = `${baseUrl}/sdapi/v1/txt2img`;
-    const progressUrl = `${baseUrl}/sdapi/v1/progress`;
 
     let isDone = false;
     let data = null;
-    let interrupted = false; // ★中断フラグ
+    let interrupted = false;
 
     try {
         const generationPromise = fetch(generationUrl, {
@@ -207,8 +206,7 @@ async function callSDGenerationAPI(payload, fileItem) {
 
         while (!isDone && !interrupted) {
             try {
-                const res = await fetch(progressUrl);
-                const prog = await res.json();
+                const prog = await callSDProgressAPI();
 
                 if (prog.state?.interrupted) {
                     console.warn("Generation interrupted!");
@@ -242,6 +240,21 @@ async function callSDGenerationAPI(payload, fileItem) {
     return { data, interrupted };
 }
 
+async function callSDProgressAPI() {
+    const baseUrl = document.getElementById("webui-url").value;
+    const progressUrl = `${baseUrl}/sdapi/v1/progress`;
+
+    try {
+        const res = await fetch(progressUrl);
+        const prog = await res.json();
+        console.log("Progress:", prog);
+        return prog;
+    } catch (err) {
+        console.warn("Progress check error:", err);
+        return null;
+    }
+}
+
 async function callSDInterruptAPI() {
     const baseUrl = document.getElementById("webui-url").value;
     const interruptUrl = `${baseUrl}/sdapi/v1/interrupt`;
@@ -270,7 +283,7 @@ async function loadDropdowns() {
     const adetailerSelect = document.getElementById("adetailer-model");
     const upscalerError = document.getElementById("hires-upscaler-error");
     const adetailerError = document.getElementById("adetailer-model-error");
-    const generateBtn = document.getElementById("generate-btn"); // 追加
+    const generateBtn = document.getElementById("generate-btn");
 
     upscalerSelect.innerHTML = "";
     adetailerSelect.innerHTML = "";
@@ -365,7 +378,7 @@ function addFileItem(file) {
 async function adjustWindowHeight(selectedCount) {
     const baseHeight = 460;      // main padding + ヘッダー + ボタンなど余白
     const itemHeight = 60;       // .file-item の高さ目安
-    const maxHeight = 900;       // ウィンドウ最大高さ
+    const maxHeight = 800;       // ウィンドウ最大高さ
 
     // 選択ファイルに応じた高さ
     selectedCount = Math.min(selectedCount, 3);

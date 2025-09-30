@@ -1,5 +1,5 @@
 # Eagle SD Image Detailer
-Eagle で選択した画像をまとめて Hires fix/ADeteiler を有効にして生成するプラグイン
+Eagle で選択した複数の画像を、 Hires fix/ADetailer を有効にしてまとめて生成するプラグイン
 
 ## 前提
 [sdweb-eagle-pnginfo](https://github.com/bbc-mc/sdweb-eagle-pnginfo) で Eagle に自動登録された画像のみ利用出来ます。
@@ -14,7 +14,7 @@ Eagle で選択した画像をまとめて Hires fix/ADeteiler を有効にし�
 Stable Diffusion WebUI を API を呼びせる状態で起動しておきます。
 <br>（起動オプションに `--api` を指定して起動すればOK）
 
-Stability Matrix の場合は以下の部分で指定します。
+Stability Matrix の場合は以下の部分で指定出来ます。
 
 <table>
   <tr>
@@ -27,7 +27,7 @@ Stability Matrix の場合は以下の部分で指定します。
 SD Image Detailer.eagleplugin を実行
 
 ## 使用方法
-Eagle で Hires fix/ADeteiler をかけたい画像を任意の枚数選択します。
+Eagle で Hires fix/ADetailer をかけたい画像を任意の枚数選択します。
 
 選択した画像を右クリックし、プラグイン → SD Image Detailer の順に選択します。
 <br>（ショートカットキーも登録可能）
@@ -36,7 +36,7 @@ Eagle で Hires fix/ADeteiler をかけたい画像を任意の枚数選択し�
 
 <br>
 
-ウィンドウが開くので、Hires fix/ADeteiler の有効/無効とパラメータを設定します。
+ウィンドウが開くので、Hires fix/ADetailer のパラメータを指定します。
 
 初回のみ、 Stable Diffusion WebUI URL 欄に Stable Diffusion WebUI のURLを入力します。
 <br>（デフォルト値と異なる場合のみ）

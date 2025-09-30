@@ -19,18 +19,30 @@ eagle.onPluginCreate(async (plugin) => {
     // ウィンドウ高さ自動調整
     await adjustWindowHeight(selected_items.length);
 
-    toggleFieldset(document.getElementById('hires-enabled').closest('fieldset'), document.getElementById('hires-enabled'));
-    toggleFieldset(document.getElementById('adetailer-enabled').closest('fieldset'), document.getElementById('adetailer-enabled'));
-
     // URL入力欄が変更されたときにドロップダウン再読み込み
     const webuiUrlInput = document.getElementById("webui-url");
-    webuiUrlInput.addEventListener("change", async () => {
-        console.log("WebUI URL changed:", webuiUrlInput.value);
+    webuiUrlInput.addEventListener("input", async () => {
         await loadDropdowns();
     });
 
+    // 前回の状態読み込み
+    loadUIState();
+
+    // Hires/ADetailerの有効/無効の表示切り替え
+    toggleFieldset(document.getElementById('hires-enabled').closest('fieldset'), document.getElementById('hires-enabled'));
+    toggleFieldset(document.getElementById('adetailer-enabled').closest('fieldset'), document.getElementById('adetailer-enabled'));
+
     // Upscaler, ADtailerModelのドロップダウンリスト読み込み
     await loadDropdowns();
+
+    // ドロップダウンリストの反映のためもう一度読み込み
+    loadUIState();
+
+    // UI変更時に状態保存
+    document.querySelectorAll("input, select").forEach(el => {
+        el.addEventListener("change", saveUIState);
+        el.addEventListener("input", saveUIState);
+    });
 
     // 生成ボタン
     const generateBtn = document.querySelector('#generate-btn');
@@ -303,7 +315,6 @@ async function loadDropdowns() {
             opt.textContent = u.name;
             upscalerSelect.appendChild(opt);
         });
-        upscalerSelect.value = "4x-AnimeSharp";
     } catch (err) {
         console.error("Upscaler fetch error:", err);
         upscalerError.textContent = "※取得失敗";
@@ -320,7 +331,6 @@ async function loadDropdowns() {
             opt.textContent = model;
             adetailerSelect.appendChild(opt);
         });
-        adetailerSelect.value = "face_yolov8n.pt";
     } catch (err) {
         console.error("ADetailer fetch error:", err);
         adetailerError.textContent = "※取得失敗";
@@ -421,4 +431,39 @@ async function updateTheme() {
     htmlEl.setAttribute('theme', themeName);
     htmlEl.setAttribute('platform', eagle.app.platform);
     htmlEl.classList.remove('no-transition');
+}
+
+// 状態を保存する
+function saveUIState() {
+    const state = {
+        hiresEnabled: document.getElementById("hires-enabled").checked,
+        hiresUpscaler: document.getElementById("hires-upscaler").value,
+        hiresScale: document.getElementById("hires-scale").value,
+        hiresDenoise: document.getElementById("hires-denoise").value,
+        adetailerEnabled: document.getElementById("adetailer-enabled").checked,
+        adetailerModel: document.getElementById("adetailer-model").value,
+        adetailerDenoise: document.getElementById("adetailer-denoise").value,
+        webuiUrl: document.getElementById("webui-url").value,
+    };
+    localStorage.setItem("sd-ui-state", JSON.stringify(state));
+}
+
+// 状態を復元する
+function loadUIState() {
+    const stateStr = localStorage.getItem("sd-ui-state");
+    if (!stateStr) return;
+
+    try {
+        const state = JSON.parse(stateStr);
+        document.getElementById("hires-enabled").checked = state.hiresEnabled ?? true;
+        document.getElementById("hires-upscaler").value = state.hiresUpscaler ?? "None";
+        document.getElementById("hires-scale").value = state.hiresScale ?? "1.5";
+        document.getElementById("hires-denoise").value = state.hiresDenoise ?? "0.2";
+        document.getElementById("adetailer-enabled").checked = state.adetailerEnabled ?? true;
+        document.getElementById("adetailer-model").value = state.adetailerModel ?? "face_yolov8n.pt";
+        document.getElementById("adetailer-denoise").value = state.adetailerDenoise ?? "0.2";
+        document.getElementById("webui-url").value = state.webuiUrl ?? "http://127.0.0.1:7860";
+    } catch (e) {
+        console.error("UI state restore error:", e);
+    }
 }
